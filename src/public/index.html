@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>WayForPay Test Interface</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            padding: 12px 30px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+        .success {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .payment-link {
+            word-break: break-all;
+            background-color: #e9ecef;
+            padding: 10px;
+            border-radius: 3px;
+            margin-top: 10px;
+        }
+        .qr-code {
+            margin-top: 15px;
+            text-align: center;
+        }
+        .qr-code img {
+            max-width: 200px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            color: #6c757d;
+        }
+
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>WayForPay Test Interface</h1>
+        
+        <form id="paymentForm">
+            <div class="form-group">
+                <label for="amount">Amount:</label>
+                <input type="number" id="amount" name="amount" step="0.01" min="0.01" required value="100">
+            </div>
+            
+            <div class="form-group">
+                <label for="currency">Currency:</label>
+                <select id="currency" name="currency">
+                    <option value="UAH">UAH (Ukrainian Hryvnia)</option>
+                    <option value="USD">USD (US Dollar)</option>
+                    <option value="EUR">EUR (Euro)</option>
+                    <option value="RUB">RUB (Russian Ruble)</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="productName">Product Name:</label>
+                <input type="text" id="productName" name="productName" value="Test Product">
+            </div>
+            
+            <button type="submit">Create Payment Link</button>
+        </form>
+        
+        <div class="loading" id="loading">
+            Creating payment link...
+        </div>
+        
+        <div class="result" id="result">
+            <div id="resultContent"></div>
+        </div>
+        
+
+    </div>
+
+    <script>
+        document.getElementById('paymentForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            createPayment();
+        });
+
+        async function createPayment() {
+            const formData = new FormData(document.getElementById('paymentForm'));
+            const data = Object.fromEntries(formData.entries());
+            
+            data.amount = parseFloat(data.amount);
+            
+            showLoading(true);
+            hideResult();
+            
+            try {
+                const response = await fetch('/create-payment', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                showResult(result, response.ok);
+            } catch (error) {
+                showResult({ success: false, message: 'Network error: ' + error.message }, false);
+            } finally {
+                showLoading(false);
+            }
+        }
+
+
+
+        function showResult(result, isSuccess) {
+            const resultDiv = document.getElementById('result');
+            const contentDiv = document.getElementById('resultContent');
+            
+            resultDiv.className = 'result ' + (isSuccess ? 'success' : 'error');
+            
+            if (isSuccess && result.success && result.data) {
+                const data = result.data;
+                contentDiv.innerHTML = `
+                    <h3>Payment Link Created Successfully!</h3>
+                    <p><strong>Order Reference:</strong> ${data.orderReference}</p>
+                    <p><strong>Amount:</strong> ${data.amount || '100'} ${data.currency || 'UAH'}</p>
+                    <p><strong>Product:</strong> ${data.productName || 'Test Product'}</p>
+                    
+                    ${data.invoiceUrl ? `
+                        <p><strong>Payment Link:</strong></p>
+                        <div class="payment-link">
+                            <a href="${data.invoiceUrl}" target="_blank">${data.invoiceUrl}</a>
+                        </div>
+                    ` : ''}
+                    
+                    ${data.qrCode ? `
+                        <div class="qr-code">
+                            <p><strong>QR Code:</strong></p>
+                            <img src="${data.qrCode}" alt="QR Code" />
+                        </div>
+                    ` : ''}
+                    
+                    <p><strong>Status:</strong> ${data.reason} (Code: ${data.reasonCode})</p>
+                `;
+            } else {
+                contentDiv.innerHTML = `
+                    <h3>Error</h3>
+                    <p>${result.message || result.error || 'Unknown error occurred'}</p>
+                    ${result.error ? `<pre>${JSON.stringify(result.error, null, 2)}</pre>` : ''}
+                `;
+            }
+            
+            resultDiv.style.display = 'block';
+        }
+
+        function showLoading(show) {
+            document.getElementById('loading').style.display = show ? 'block' : 'none';
+        }
+
+        function hideResult() {
+            document.getElementById('result').style.display = 'none';
+        }
+    </script>
+</body>
+</html> 
