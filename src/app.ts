@@ -38,57 +38,10 @@ app.get('/', (req, res) => {
                 createPayment: 'POST /create-payment',
                 webhook: 'POST /webhook/wayforpay',
                 testPayment: 'GET /test-payment',
-                currencyRates: 'GET /currency-rates',
-                health: 'GET /health'
             }
         });
     } else {
         res.sendFile(path.join(__dirname, 'public', 'index.html'));
-    }
-});
-
-app.get('/test-payment', async (req, res) => {
-    try {
-        const orderReference = `order_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-        
-        const paymentData = {
-            orderReference,
-            productName: ['Test Product'],
-            productCount: [1],
-            productPrice: [100], // 100 UAH
-        };
-
-        console.log('Creating payment with data:', paymentData);
-        
-        const response = await wfp.createInvoiceUrl(paymentData);
-        
-        if (response.error) {
-            return res.status(400).json({
-                success: false,
-                error: response.error,
-                message: 'Failed to create payment link'
-            });
-        }
-
-        const invoice = response.value;
-        
-        return res.json({
-            success: true,
-            data: {
-                orderReference,
-                invoiceUrl: invoice?.invoiceUrl,
-                qrCode: invoice?.qrCode,
-                reason: (invoice as any)?.reason || 'Ok',
-                reasonCode: (invoice as any)?.reasonCode || 1100
-            }
-        });
-    } catch (error) {
-        console.error('Error creating test payment:', error);
-        return res.status(500).json({
-            success: false,
-            error: error instanceof Error ? error.message : 'Unknown error',
-            message: 'Failed to create test payment'
-        });
     }
 });
 
